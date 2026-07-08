@@ -111,12 +111,13 @@
 
 <script>
 /* ── config ────────────────────────────────────────────────────────────────
-   defaults here; per-link overrides via URL params:
+   defaults here; per-link settings via URL params:
      ?n=Sarah                 → her name in the headline + in the phone push
+     &t=your-ntfy-topic       → ntfy.sh topic for the answer push (kept out of
+                                the code on purpose — lives only in links you send)
      &o=dinner,coffee,golf    → which options show, from the catalog
-   e.g.  https://<you>.github.io/hey/?n=Sarah&o=dinner,movie,coffee        */
+   e.g.  https://<you>.github.io/hey/?n=Sarah&t=<topic>&o=dinner,movie     */
 const CONFIG = {
-  ntfyTopic: "dell-lockitin-39c6862b",
   defaultOptions: ["dinner", "movie", "coffee", "golf", "arcade", "surprise"],
   catalog: {
     dinner:   { label: "dinner" },
@@ -141,6 +142,7 @@ const CONFIG = {
 
 const params = new URLSearchParams(location.search);
 const herName = (params.get("n") || "").trim().slice(0, 30);
+const ntfyTopic = (params.get("t") || "").trim().replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64);
 const optIds = (params.get("o") || "").split(",").map(s => s.trim()).filter(id => CONFIG.catalog[id]);
 const OPTIONS = optIds.length ? optIds : CONFIG.defaultOptions;
 
@@ -210,8 +212,12 @@ $("lockBtn").addEventListener("click", async () => {
   $("doneSub").textContent = `${day} — ${choices}. i'll text you the details.`;
   show("done");
   confetti();
+  if (!ntfyTopic) {
+    $("lockline").textContent = "screenshot this and send it to him. yes, really.";
+    return;
+  }
   try {
-    await fetch(`https://ntfy.sh/${CONFIG.ntfyTopic}`, {
+    await fetch(`https://ntfy.sh/${ntfyTopic}`, {
       method: "POST",
       headers: { "Title": "LOCK IT IN", "Priority": "high", "Tags": "tada" },
       body: `${herName || "she"} said yes — ${day} — ${choices}` + (noTries ? ` (tried to hit no x${noTries})` : ""),
