@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>quick question</title>
+<style>
+  :root {
+    --paper: #faf6f0; --ink: #2b2620; --soft: #8a7f70; --accent: #c2452d;
+    --line: #e5dcd0; --raise: #fff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #1c1916; --ink: #ece5da; --soft: #9a8f80; --accent: #e06a50;
+      --line: #363028; --raise: #262119;
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    background: var(--paper); color: var(--ink);
+    display: grid; place-items: center; overflow: hidden;
+    padding: max(20px, env(safe-area-inset-top)) 22px max(20px, env(safe-area-inset-bottom));
+  }
+  .screen { width: min(400px, 100%); display: none; animation: settle .45s ease both; }
+  .screen.active { display: block; }
+  @keyframes settle { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+
+  h1 { font-size: clamp(1.7rem, 7.5vw, 2.3rem); font-weight: 400; font-style: italic; line-height: 1.25; margin-bottom: 14px; }
+  .sub { color: var(--soft); font-size: 1rem; margin-bottom: 34px; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .8rem; color: var(--soft); }
+
+  button {
+    font: inherit; cursor: pointer; border-radius: 10px;
+    padding: 12px 28px; font-size: 1.02rem;
+    border: 1px solid var(--line); background: var(--raise); color: var(--ink);
+    transition: transform .14s ease, border-color .14s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:active { transform: scale(.97); }
+  .yes { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-row { display: flex; gap: 12px; align-items: center; min-height: 110px; }
+  #noWrap { transition: transform .22s cubic-bezier(.2,.9,.3,1.3); display: inline-block; }
+  .quip { min-height: 1.5em; margin-top: 10px; }
+
+  #boot { text-align: left; }
+  #boot .line { opacity: 0; animation: settle .3s ease forwards; margin-bottom: 9px; }
+  .ok { color: #2e7d4f; }
+  @media (prefers-color-scheme: dark) { .ok { color: #6fbf8f; } }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 26px; }
+  .opt {
+    padding: 13px 8px; font-size: .95rem; border-radius: 10px; text-align: center;
+  }
+  .opt.sel { border-color: var(--accent); color: var(--accent); }
+  input[type="date"] {
+    font: inherit; font-size: 1.05rem; color: var(--ink); background: var(--raise);
+    border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px;
+    margin-bottom: 26px; width: 100%; text-align: center;
+  }
+  input[type="date"]:focus { outline: none; border-color: var(--accent); }
+  .rule { border: 0; border-top: 1px solid var(--line); margin: 26px 0 14px; }
+
+  .cf { position: fixed; top: -14px; width: 7px; height: 11px; border-radius: 2px;
+        animation: fall linear forwards; pointer-events: none; opacity: .85; }
+  @keyframes fall { to { transform: translateY(108vh) rotate(600deg); } }
+</style>
+</head>
+<body>
+
+<section id="boot" class="screen active mono">
+  <div class="line" style="animation-delay:.2s">$ ./ask.sh --carefully</div>
+  <div class="line" style="animation-delay:1.0s">running pre-flight checks… <span id="bar">▱▱▱▱▱</span></div>
+  <div class="line" style="animation-delay:2.3s">nerves: <span class="ok">within acceptable limits</span></div>
+  <div class="line" style="animation-delay:3.0s">ok. here goes.</div>
+</section>
+
+<section id="ask">
+  <h1 id="askTitle">will you go out with me?</h1>
+  <p class="sub">i built you a whole webpage instead of just texting you. this felt normal at the time.</p>
+  <div class="btn-row">
+    <button class="yes" id="yesBtn">yes</button>
+    <span id="noWrap"><button id="noBtn">no</button></span>
+  </div>
+  <p class="quip mono" id="noQuip"></p>
+</section>
+
+<section id="day">
+  <h1>ok — when?</h1>
+  <p class="sub">pick a day that works. i'll handle the rest.</p>
+  <input type="date" id="datePick">
+  <button class="yes" id="dayBtn">continue</button>
+</section>
+
+<section id="what">
+  <h1>and what are we doing?</h1>
+  <p class="sub">pick one. two if you can't decide — i respect indecision.</p>
+  <div class="grid" id="optGrid"></div>
+  <button class="yes" id="lockBtn">lock it in</button>
+  <p class="quip mono" id="optQuip"></p>
+</section>
+
+<section id="done">
+  <h1>it's a date.</h1>
+  <p class="sub" id="doneSub"></p>
+  <hr class="rule">
+  <p class="mono" id="lockline">sending this to my phone…</p>
+</section>
+
+<script>
+/* ── config ────────────────────────────────────────────────────────────────
+   defaults here; per-link overrides via URL params:
+     ?n=Sarah                 → her name in the headline + in the phone push
+     &o=dinner,coffee,golf    → which options show, from the catalog
+   e.g.  https://<you>.github.io/hey/?n=Sarah&o=dinner,movie,coffee        */
+const CONFIG = {
+  ntfyTopic: "dell-lockitin-39c6862b",
+  defaultOptions: ["dinner", "movie", "coffee", "golf", "arcade", "surprise"],
+  catalog: {
+    dinner:   { label: "dinner" },
+    movie:    { label: "movie night" },
+    coffee:   { label: "coffee + a walk" },
+    golf:     { label: "mini golf" },
+    arcade:   { label: "arcade" },
+    museum:   { label: "museum" },
+    drive:    { label: "sunset drive" },
+    icecream: { label: "ice cream run" },
+    picnic:   { label: "picnic", quip: "a picnic. in phoenix. in july. bold. it stays picked, but i'm bringing a canopy and 2L of water." },
+    surprise: { label: "surprise me" },
+  },
+  noLines: [
+    "huh. weird. try again",
+    "yeah that button's been broken for a while",
+    "i can do this all day. it's literally my job",
+    "the no button has filed a complaint about you",
+    "at this point 'yes' is just the efficient choice",
+  ],
+};
+
+const params = new URLSearchParams(location.search);
+const herName = (params.get("n") || "").trim().slice(0, 30);
+const optIds = (params.get("o") || "").split(",").map(s => s.trim()).filter(id => CONFIG.catalog[id]);
+const OPTIONS = optIds.length ? optIds : CONFIG.defaultOptions;
+
+const $ = id => document.getElementById(id);
+const show = id => {
+  document.querySelectorAll("section").forEach(s => s.classList.remove("active"));
+  $(id).classList.add("active");
+};
+
+/* boot bar + auto-advance */
+(() => {
+  const frames = ["▰▱▱▱▱", "▰▰▱▱▱", "▰▰▰▱▱", "▰▰▰▰▱", "▰▰▰▰▰"];
+  let i = 0;
+  const t = setInterval(() => {
+    $("bar").textContent = frames[Math.min(i++, frames.length - 1)];
+    if (i >= frames.length) clearInterval(t);
+  }, 240);
+  setTimeout(() => show("ask"), 3800);
+})();
+
+if (herName) {
+  $("askTitle").textContent = `${herName.toLowerCase()} — will you go out with me?`;
+  document.title = `${herName.toLowerCase()}, quick question`;
+}
+
+/* the no button has other plans */
+let noTries = 0;
+const dodge = () => {
+  noTries++;
+  const x = (Math.random() * 150 - 75) | 0;
+  const y = (Math.random() * 110 - 55) | 0;
+  $("noWrap").style.transform = `translate(${x}px, ${y}px)`;
+  $("noQuip").textContent = CONFIG.noLines[Math.min(noTries - 1, CONFIG.noLines.length - 1)];
+};
+$("noBtn").addEventListener("pointerenter", dodge);
+$("noBtn").addEventListener("click", dodge);
+
+$("yesBtn").addEventListener("click", () => {
+  const d = $("datePick");
+  const today = new Date();
+  d.min = today.toISOString().slice(0, 10);
+  d.value = new Date(today.getTime() + 3 * 864e5).toISOString().slice(0, 10);
+  show("day");
+});
+
+$("dayBtn").addEventListener("click", () => show("what"));
+
+/* options (max 2) */
+const picked = new Set();
+OPTIONS.forEach(id => {
+  const o = CONFIG.catalog[id];
+  const b = document.createElement("button");
+  b.className = "opt"; b.textContent = o.label; b.dataset.id = id;
+  b.addEventListener("click", () => {
+    if (picked.has(id)) { picked.delete(id); b.classList.remove("sel"); }
+    else if (picked.size < 2) { picked.add(id); b.classList.add("sel"); }
+    $("optQuip").textContent = (picked.has(id) && o.quip) ? o.quip : "";
+  });
+  $("optGrid").appendChild(b);
+});
+
+/* lock it in → confetti + push to his phone */
+$("lockBtn").addEventListener("click", async () => {
+  if (!picked.size) { $("optQuip").textContent = "gotta pick at least one"; return; }
+  const day = $("datePick").value || "someday";
+  const choices = [...picked].map(id => CONFIG.catalog[id].label).join(" + ");
+  $("doneSub").textContent = `${day} — ${choices}. i'll text you the details.`;
+  show("done");
+  confetti();
+  try {
+    await fetch(`https://ntfy.sh/${CONFIG.ntfyTopic}`, {
+      method: "POST",
+      headers: { "Title": "LOCK IT IN", "Priority": "high", "Tags": "tada" },
+      body: `${herName || "she"} said yes — ${day} — ${choices}` + (noTries ? ` (tried to hit no x${noTries})` : ""),
+    });
+    $("lockline").innerHTML = 'sent <span class="ok">✓</span> — he knows. he\'s being weird about it already.';
+  } catch {
+    $("lockline").textContent = "couldn't reach his phone — tell him yourself, it's better in person anyway.";
+  }
+});
+
+function confetti() {
+  const colors = ["#c2452d", "#e0a025", "#4a7d5c", "#5c6e9e", "#b06a8f"];
+  for (let i = 0; i < 46; i++) {
+    const s = document.createElement("span");
+    s.className = "cf";
+    s.style.background = colors[(Math.random() * colors.length) | 0];
+    s.style.left = Math.random() * 100 + "vw";
+    s.style.animationDuration = 2.4 + Math.random() * 2.6 + "s";
+    s.style.animationDelay = Math.random() * 1.1 + "s";
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 7000);
+  }
+}
+</script>
+</body>
+</html>
