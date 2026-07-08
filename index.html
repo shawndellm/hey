@@ -221,13 +221,21 @@ const dodge = () => {
   if (!w.classList.contains("loose")) {
     const r = w.getBoundingClientRect();
     w.classList.add("loose");
+    document.body.appendChild(w);  /* escape the animated section — a transformed
+                                      ancestor re-anchors position:fixed and sends
+                                      the button off-screen */
     w.style.left = r.left + "px";
     w.style.top = r.top + "px";
     void w.offsetWidth;  /* commit start position so the first jump animates */
   }
+  const vv = window.visualViewport;
+  const vw = vv ? vv.width : innerWidth;
+  const vh = vv ? vv.height : innerHeight;
   const pad = 14;
-  const x = pad + Math.random() * Math.max(1, innerWidth - w.offsetWidth - pad * 2);
-  const y = pad + Math.random() * Math.max(1, innerHeight - w.offsetHeight - pad * 2);
+  const maxX = Math.max(pad, vw - w.offsetWidth - pad);
+  const maxY = Math.max(pad, vh - w.offsetHeight - pad);
+  const x = Math.min(maxX, pad + Math.random() * (maxX - pad));
+  const y = Math.min(maxY, pad + Math.random() * (maxY - pad));
   w.style.left = x + "px";
   w.style.top = y + "px";
   $("noBtn").textContent = CONFIG.noLabels[Math.min(noTries, CONFIG.noLabels.length - 1)];
