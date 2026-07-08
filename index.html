@@ -58,7 +58,11 @@
   .yes.plead { animation: plead 1.6s ease-in-out infinite; }
   @keyframes plead { 50% { transform: scale(1.045); } }
   .btn-row { display: flex; gap: 12px; align-items: center; min-height: 110px; }
-  #noWrap { transition: transform .22s cubic-bezier(.2,.9,.3,1.3); display: inline-block; }
+  #noWrap { display: inline-block; transition: opacity .4s ease; }
+  #noWrap.loose {
+    position: fixed; z-index: 5;
+    transition: left .32s cubic-bezier(.2,.8,.3,1.25), top .32s cubic-bezier(.2,.8,.3,1.25), opacity .4s ease;
+  }
   .quip { min-height: 1.5em; margin-top: 10px; }
 
   #boot { text-align: left; }
@@ -119,7 +123,7 @@
 
 <section id="day" class="screen">
   <h1>ok — when?</h1>
-  <p class="sub">pick a day that works. i'll handle the rest.</p>
+  <p class="sub">pick a day that works. i checked my calendar already — it's embarrassingly open.</p>
   <input type="date" id="datePick">
   <button class="yes" id="dayBtn">continue</button>
 </section>
@@ -150,24 +154,27 @@
 const CONFIG = {
   defaultOptions: ["dinner", "movie", "coffee", "golf", "arcade", "surprise"],
   catalog: {
-    dinner:   { label: "dinner" },
-    movie:    { label: "movie night" },
-    coffee:   { label: "coffee + a walk" },
-    golf:     { label: "mini golf" },
-    arcade:   { label: "arcade" },
-    museum:   { label: "museum" },
-    drive:    { label: "sunset drive" },
-    icecream: { label: "ice cream run" },
+    dinner:   { label: "dinner", quip: "good. i already have a place in mind and i've been sitting on it." },
+    movie:    { label: "movie night", quip: "you pick the movie. i'll have opinions about the snacks." },
+    coffee:   { label: "coffee + a walk", quip: "a classic. low stakes, high conversation. smart." },
+    golf:     { label: "mini golf", quip: "just know the windmill hole decides everything between us." },
+    arcade:   { label: "arcade", quip: "prepare to lose. lovingly. but decisively." },
+    museum:   { label: "museum", quip: "fancy. i'll wear the good shirt." },
+    drive:    { label: "sunset drive", quip: "golden hour is non-negotiable. i've checked the forecast." },
+    icecream: { label: "ice cream run", quip: "elite choice. this was a test and you passed." },
     picnic:   { label: "picnic", quip: "a picnic. in phoenix. in july. bold. it stays picked, but i'm bringing a canopy and 2L of water." },
-    surprise: { label: "surprise me" },
+    surprise: { label: "surprise me", quip: "brave. i respect it. no refunds." },
   },
+  noLabels: ["no", "nope", "still no?", "why", "plz", "ok bye"],
   noLines: [
     "huh. weird. try again",
     "yeah that button's been broken for a while",
     "i can do this all day. it's literally my job",
-    "the no button has filed a complaint about you",
-    "at this point 'yes' is just the efficient choice",
+    "it's actively fleeing now. this is on you",
+    "you can't catch it. i wrote it myself",
+    "impressive persistence. wrong target though",
   ],
+  resignLine: "the no button has resigned, effective immediately. it asked me to tell you it's nothing personal.",
 };
 
 const params = new URLSearchParams(location.search);
@@ -198,13 +205,32 @@ if (herName) {
   document.title = `${herName.toLowerCase()}, quick question`;
 }
 
-/* the no button has other plans */
+/* the no button has other plans (and eventually, a resignation letter) */
 let noTries = 0;
 const dodge = () => {
   noTries++;
-  const x = (Math.random() * 150 - 75) | 0;
-  const y = (Math.random() * 110 - 55) | 0;
-  $("noWrap").style.transform = `translate(${x}px, ${y}px)`;
+  const w = $("noWrap");
+  if (noTries > CONFIG.noLines.length) {
+    w.style.opacity = "0";
+    w.style.pointerEvents = "none";
+    setTimeout(() => w.remove(), 450);
+    $("noQuip").textContent = CONFIG.resignLine;
+    $("yesBtn").classList.add("plead");
+    return;
+  }
+  if (!w.classList.contains("loose")) {
+    const r = w.getBoundingClientRect();
+    w.classList.add("loose");
+    w.style.left = r.left + "px";
+    w.style.top = r.top + "px";
+    void w.offsetWidth;  /* commit start position so the first jump animates */
+  }
+  const pad = 14;
+  const x = pad + Math.random() * Math.max(1, innerWidth - w.offsetWidth - pad * 2);
+  const y = pad + Math.random() * Math.max(1, innerHeight - w.offsetHeight - pad * 2);
+  w.style.left = x + "px";
+  w.style.top = y + "px";
+  $("noBtn").textContent = CONFIG.noLabels[Math.min(noTries, CONFIG.noLabels.length - 1)];
   $("noQuip").textContent = CONFIG.noLines[Math.min(noTries - 1, CONFIG.noLines.length - 1)];
   if (noTries >= 3) $("yesBtn").classList.add("plead");
 };
